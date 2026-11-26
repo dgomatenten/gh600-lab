@@ -8,3 +8,5 @@ It holds a small study app (Spring Boot backend + React frontend) and the GitHub
 - Run locally: `.\start.ps1` from the repository root
 
 Practice-exam questions are not included in this repository.
+
+Ruleset test.
