@@ -1,0 +1,49 @@
+# Lab 9 — Validate the structured plan in every pull request.
+# A PR template only ASKS for a plan; this check ENFORCES it once it is
+# added as a required status check in the protect-main ruleset.
+name: Plan check
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+# The PR description comes from the event payload, so no API access is needed.
+permissions: {}
+
+jobs:
+  plan:
+    name: Plan check
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Validate plan sections
+        # Pass the PR body through an environment variable, never inline in
+        # the script: the body is untrusted text (script-injection safe).
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python3 - <<'PY'
+          import os, re, sys
+
+          body = os.environ.get("PR_BODY") or ""
+          # Remove HTML comments so the template's hints don't count as content.
+          body = re.sub(r"<!--.*?-->", "", body, flags=re.S)
+
+          required = ["Intent", "Scope", "Risk", "Success criteria", "Validation"]
+          problems = []
+          for name in required:
+              m = re.search(
+                  rf"^###\s+{re.escape(name)}\s*$(.*?)(?=^#{{2,3}}\s|\Z)",
+                  body, flags=re.M | re.S | re.I)
+              if not m:
+                  problems.append(f"missing section: ### {name}")
+              elif not m.group(1).strip():
+                  problems.append(f"empty section: ### {name}")
+
+          if problems:
+              for p in problems:
+                  print(f"::error title=Plan check::{p}")
+              print("Fill in every plan section in the PR description, then save it.")
+              sys.exit(1)
+          print("Plan check passed: all 5 sections are present and filled in.")
+          PY
