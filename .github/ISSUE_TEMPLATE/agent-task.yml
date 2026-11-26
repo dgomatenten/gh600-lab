@@ -1,0 +1,88 @@
+# Lab 8 — Task contract for agent work (GH-600 Domain 1)
+# An issue form makes every agent task state its inputs, scope,
+# outputs and measurable success criteria before work starts.
+name: Agent task
+description: A task for an AI agent, written as a task contract.
+title: "[Agent task] "
+labels: ["agent-task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Fill in every field. An agent may only work inside the allowed paths,
+        and the task is done only when every success criterion is met.
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What outcome do we want, and why? (The real intent, not the activity.)
+      placeholder: "Example: Users can import a practice test from a JSON file."
+    validations:
+      required: true
+
+  - type: textarea
+    id: inputs
+    attributes:
+      label: Inputs
+      description: Links and context the agent needs (issues, docs, sample files).
+      placeholder: "- docs/study-guide.md, Milestone 5"
+    validations:
+      required: true
+
+  - type: textarea
+    id: allowed-paths
+    attributes:
+      label: Allowed paths
+      description: The only files or folders the agent may change.
+      placeholder: |
+        - backend/src/main/java/com/gh600/study/question/
+        - frontend/src/pages/
+    validations:
+      required: true
+
+  - type: textarea
+    id: prohibited
+    attributes:
+      label: Prohibited changes
+      description: Files or kinds of change that are out of scope.
+      placeholder: |
+        - .github/workflows/
+        - Database schema changes
+    validations:
+      required: true
+
+  - type: textarea
+    id: outputs
+    attributes:
+      label: Required outputs
+      description: What the agent must produce.
+      placeholder: |
+        - A structured plan in the pull request description
+        - One pull request against main
+    validations:
+      required: true
+
+  - type: textarea
+    id: success
+    attributes:
+      label: Success criteria
+      description: Measurable checks that prove the goal is met. "The agent says it's done" does not count.
+      placeholder: |
+        - Required CI checks pass on the latest commit
+        - New endpoint has tests for valid and invalid files
+        - No files changed outside the allowed paths
+    validations:
+      required: true
+
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Risk level
+      description: Judge by consequence and how easy it is to undo, not by diff size.
+      options:
+        - Low (easy to revert, no production impact)
+        - Medium
+        - High (workflows, infra, auth, production, hard to reverse)
+    validations:
+      required: true
