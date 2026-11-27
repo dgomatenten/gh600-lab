@@ -1,0 +1,82 @@
+# Lab 10 — Risk router (GH-600 Domain 1: Q23, Q24; GH-200 basics).
+# Practises: step output -> job output -> needs:, the github context,
+# job-level if: on the trigger, and a label condition with contains().
+name: Risk router
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  workflow_dispatch:
+
+# Reads code only. No job here can write to the repository.
+permissions:
+  contents: read
+
+jobs:
+  classify:
+    name: Classify risk
+    # Trigger-specific job: only PRs have a base and head to compare.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Job outputs: how a later job reads this job's results.
+    outputs:
+      risk: ${{ steps.classify.outputs.risk }}
+      count: ${{ steps.classify.outputs.count }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # full history, so base and head can be compared
+
+      - name: Classify changed files
+        id: classify
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "Changed files:"
+          echo "$changed"
+          if echo "$changed" | grep -qE '^(\.github/workflows/|infra/)'; then
+            risk=high
+          else
+            risk=low
+          fi
+          # Step outputs: written to $GITHUB_OUTPUT, read as steps.<id>.outputs.<name>
+          echo "risk=$risk" >> "$GITHUB_OUTPUT"
+          echo "count=$(echo "$changed" | grep -c .)" >> "$GITHUB_OUTPUT"
+
+  risk-gate:
+    name: Risk gate
+    needs: classify   # waits for classify, and can read its outputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Report
+        env:
+          RISK: ${{ needs.classify.outputs.risk }}
+          COUNT: ${{ needs.classify.outputs.count }}
+        run: echo "Risk is $RISK ($COUNT changed files)."
+
+      # High-risk PRs fail until someone adds the platform-approved label.
+      # (Lab demo of a label condition. In production, use CODEOWNERS with
+      # required code-owner review instead: anyone with triage can add a label.)
+      - name: High risk needs platform review
+        if: >-
+          needs.classify.outputs.risk == 'high' &&
+          !contains(github.event.pull_request.labels.*.name, 'platform-approved')
+        run: |
+          echo "::error title=Risk gate::This PR changes workflow or infra files. Get platform review, then add the platform-approved label."
+          exit 1
+
+  diagnostics:
+    name: Manual diagnostics
+    # Runs only from the Actions tab's Run button.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - run: |
+          echo "Event: ${{ github.event_name }}"
+          echo "Ref:   ${{ github.ref }}"
+          echo "Actor: ${{ github.actor }}"
