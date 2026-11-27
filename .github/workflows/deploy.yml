@@ -1,0 +1,42 @@
+# Lab 18 — Protected deploy (GH-600 Domain 1: Q11, Q27).
+# The deploy job may only receive DEPLOY_TOKEN after a required reviewer
+# approves it in the production environment, and only from main.
+name: Deploy
+
+on:
+  workflow_dispatch:   # run by hand from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (no secrets)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Show what this job can see
+        env:
+          # Not in the production environment, so this is empty here.
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+        run: |
+          echo "Building ${{ github.sha }} from ${{ github.ref_name }}"
+          if [ -n "$DEPLOY_TOKEN" ]; then echo "DEPLOY_TOKEN: present"; else echo "DEPLOY_TOKEN: not available to this job"; fi
+
+  deploy:
+    name: Deploy to production
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # The environment gate: required reviewers + allowed branches +
+    # environment-scoped secrets. The job waits here until approved.
+    environment: production
+    steps:
+      - name: Use the deploy credential
+        env:
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+        run: |
+          # Never print a secret's value; only whether it is present.
+          if [ -n "$DEPLOY_TOKEN" ]; then echo "DEPLOY_TOKEN: present (released after approval)"; else echo "::error::DEPLOY_TOKEN missing"; exit 1; fi
+          echo "Pretend deploy of ${{ github.sha }} done."
